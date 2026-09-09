@@ -1,0 +1,12 @@
+{
+  "name": "kaxro",
+  "version": "1.0.0",
+  "description": "KaXro Middleman Discord Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.21.0"
+  }
+}
