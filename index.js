@@ -1,7 +1,9 @@
 const {
     Client,
     GatewayIntentBits,
-    Collection
+    Collection,
+    REST,
+    Routes
 } = require("discord.js");
 
 const fs = require("fs");
@@ -15,29 +17,50 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Load commands
+const commands = [];
 const commandsPath = path.join(__dirname, "commands");
 
-if (fs.existsSync(commandsPath)) {
-    const commandFiles = fs.readdirSync(commandsPath)
-        .filter(file => file.endsWith(".js"));
+function loadCommands(directory) {
+    const files = fs.readdirSync(directory);
 
-    for (const file of commandFiles) {
-        const filePath = path.join(commandsPath, file);
-        const command = require(filePath);
+    for (const file of files) {
+        const filePath = path.join(directory, file);
+        const stat = fs.statSync(filePath);
 
-        if ("data" in command && "execute" in command) {
-            client.commands.set(command.data.name, command);
+        if (stat.isDirectory()) {
+            loadCommands(filePath);
+        } else if (file.endsWith(".js")) {
+            const command = require(filePath);
+
+            if (command.data && command.execute) {
+                client.commands.set(command.data.name, command);
+                commands.push(command.data.toJSON());
+            }
         }
     }
 }
 
-client.once("ready", () => {
+loadCommands(commandsPath);
+
+client.once("ready", async () => {
     console.log(`KaXro is online as ${client.user.tag}`);
     console.log(`Loaded ${client.commands.size} command(s).`);
+
+    try {
+        const rest = new REST({ version: "10" })
+            .setToken(process.env.BOT_TOKEN);
+
+        await rest.put(
+            Routes.applicationCommands(process.env.CLIENT_ID),
+            { body: commands }
+        );
+
+        console.log("Slash commands deployed successfully.");
+    } catch (error) {
+        console.error("Failed to deploy commands:", error);
+    }
 });
 
-// Handle slash commands
 client.on("interactionCreate", async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -52,12 +75,12 @@ client.on("interactionCreate", async interaction => {
 
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp({
-                content: "Something went wrong while running this command.",
+                content: "Something went wrong.",
                 ephemeral: true
             });
         } else {
             await interaction.reply({
-                content: "Something went wrong while running this command.",
+                content: "Something went wrong.",
                 ephemeral: true
             });
         }
