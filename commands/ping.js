@@ -6,8 +6,8 @@ module.exports = {
         .setDescription("Check if KaXro is online."),
 
     async execute(interaction) {
-        await interaction.reply({
-            content: `🏓 Pong! \`${interaction.client.ws.ping}ms\``
-        });
+        await interaction.reply(
+            `🏓 Pong! \`${interaction.client.ws.ping}ms\``
+        );
     }
 };
