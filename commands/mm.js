@@ -16,8 +16,7 @@ module.exports = {
             .setColor("#C99A3D")
             .setTitle("KA7X Middleman")
             .setDescription(
-                "Use the buttons below to start a middleman request or view information.\n\n" +
-                "Both members must be in this server."
+                "Use the buttons below to start a middleman request or view your requests."
             );
 
         const row = new ActionRowBuilder()
@@ -28,6 +27,11 @@ module.exports = {
                     .setStyle(ButtonStyle.Secondary),
 
                 new ButtonBuilder()
+                    .setCustomId("mm_requests")
+                    .setLabel("MM Status")
+                    .setStyle(ButtonStyle.Secondary),
+
+                new ButtonBuilder()
                     .setCustomId("mm_info")
                     .setLabel("MM Info")
                     .setStyle(ButtonStyle.Secondary),
@@ -35,11 +39,6 @@ module.exports = {
                 new ButtonBuilder()
                     .setCustomId("mm_rules")
                     .setLabel("MM Rules")
-                    .setStyle(ButtonStyle.Secondary),
-
-                new ButtonBuilder()
-                    .setCustomId("mm_status")
-                    .setLabel("MM Status")
                     .setStyle(ButtonStyle.Secondary)
             );
 
