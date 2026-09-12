@@ -4,424 +4,207 @@ const {
     Collection,
     REST,
     Routes,
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
     ModalBuilder,
     TextInputBuilder,
-    TextInputStyle
+    TextInputStyle,
+    ActionRowBuilder,
+    EmbedBuilder,
+    ButtonBuilder,
+    ButtonStyle
 } = require("discord.js");
 
 const fs = require("fs");
 const path = require("path");
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers
-    ]
+    intents: [GatewayIntentBits.Guilds]
 });
 
 client.commands = new Collection();
 
-const commandsPath = path.join(__dirname, "commands");
+// Load commands
+const commandPath = path.join(__dirname, "commands");
 
-if (fs.existsSync(commandsPath)) {
-    const files = fs.readdirSync(commandsPath).filter(file => file.endsWith(".js"));
+for (const file of fs.readdirSync(commandPath).filter(f => f.endsWith(".js"))) {
+    const command = require(path.join(commandPath, file));
 
-    for (const file of files) {
-        const filePath = path.join(commandsPath, file);
-        const command = require(filePath);
-
-        if (command.data && command.execute) {
-            client.commands.set(command.data.name, command);
-            console.log(`Loaded command: ${command.data.name}`);
-        }
+    if (command.data && command.execute) {
+        client.commands.set(command.data.name, command);
+        console.log(`Loaded command: ${command.data.name}`);
     }
 }
 
+// Deploy commands automatically
 client.once("clientReady", async () => {
     console.log(`KaXro is online as ${client.user.tag}`);
 
-    try {
-        const rest = new REST({ version: "10" }).setToken(
-            process.env.BOT_TOKEN
-        );
+    const rest = new REST({ version: "10" })
+        .setToken(process.env.BOT_TOKEN);
 
-        const commands = [...client.commands.values()].map(command =>
-            command.data.toJSON()
-        );
+    await rest.put(
+        Routes.applicationGuildCommands(
+            process.env.CLIENT_ID,
+            process.env.GUILD_ID
+        ),
+        {
+            body: [...client.commands.values()].map(c => c.data.toJSON())
+        }
+    );
 
-        await rest.put(
-            Routes.applicationGuildCommands(
-                process.env.CLIENT_ID,
-                process.env.GUILD_ID
-            ),
-            {
-                body: commands
-            }
-        );
-
-        console.log(`Deployed ${commands.length} command(s) successfully.`);
-    } catch (error) {
-        console.error("Command deployment error:", error);
-    }
+    console.log("Slash commands deployed.");
 });
 
+// Interactions
 client.on("interactionCreate", async interaction => {
-    try {
 
-        // SLASH COMMANDS
-        if (interaction.isChatInputCommand()) {
-            const command = client.commands.get(interaction.commandName);
+    // Slash commands
+    if (interaction.isChatInputCommand()) {
+        const command = client.commands.get(interaction.commandName);
+        if (command) await command.execute(interaction);
+        return;
+    }
 
-            if (!command) return;
+    // Start Cross Trade
+    if (interaction.isButton() && interaction.customId === "mm_start") {
 
-            await command.execute(interaction);
-            return;
+        const modal = new ModalBuilder()
+            .setCustomId("cross_trade")
+            .setTitle("Cross Trade");
+
+        const user1 = new TextInputBuilder()
+            .setCustomId("user1")
+            .setLabel("User 1")
+            .setPlaceholder("User 1 ID or @mention")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const user2 = new TextInputBuilder()
+            .setCustomId("user2")
+            .setLabel("User 2")
+            .setPlaceholder("User 2 ID or @mention")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
+
+        const give1 = new TextInputBuilder()
+            .setCustomId("give1")
+            .setLabel("What is User 1 giving?")
+            .setPlaceholder("Example: Meowl")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        const give2 = new TextInputBuilder()
+            .setCustomId("give2")
+            .setLabel("What is User 2 giving?")
+            .setPlaceholder("Example: Dragon Cannelloni")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(user1),
+            new ActionRowBuilder().addComponents(user2),
+            new ActionRowBuilder().addComponents(give1),
+            new ActionRowBuilder().addComponents(give2)
+        );
+
+        await interaction.showModal(modal);
+        return;
+    }
+
+    // Cross Trade submitted
+    if (interaction.isModalSubmit() && interaction.customId === "cross_trade") {
+
+        const user1 = interaction.fields.getTextInputValue("user1");
+        const user2 = interaction.fields.getTextInputValue("user2");
+        const give1 = interaction.fields.getTextInputValue("give1");
+        const give2 = interaction.fields.getTextInputValue("give2");
+
+        const id1 = user1.replace(/[<@!>]/g, "");
+        const id2 = user2.replace(/[<@!>]/g, "");
+
+        const member1 = await interaction.guild.members.fetch(id1).catch(() => null);
+        const member2 = await interaction.guild.members.fetch(id2).catch(() => null);
+
+        if (!member1) {
+            return interaction.reply({
+                content: "User 1 is not in this server.",
+                ephemeral: true
+            });
         }
 
-        // START CROSS TRADE
-        if (
-            interaction.isButton() &&
-            interaction.customId === "mm_start"
-        ) {
-            const modal = new ModalBuilder()
-                .setCustomId("cross_trade_form")
-                .setTitle("Cross Trade");
+        if (!member2) {
+            return interaction.reply({
+                content: "User 2 is not in this server.",
+                ephemeral: true
+            });
+        }
 
-            const user1 = new TextInputBuilder()
-                .setCustomId("user1")
-                .setLabel("User 1")
-                .setPlaceholder("Enter User 1 ID or mention")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
+        if (id1 === id2) {
+            return interaction.reply({
+                content: "User 1 and User 2 cannot be the same person.",
+                ephemeral: true
+            });
+        }
 
-            const user2 = new TextInputBuilder()
-                .setCustomId("user2")
-                .setLabel("User 2")
-                .setPlaceholder("Enter User 2 ID or mention")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            const user1Giving = new TextInputBuilder()
-                .setCustomId("user1_giving")
-                .setLabel("What is User 1 giving?")
-                .setPlaceholder("Example: 1x Meowl")
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(true);
-
-            const user2Giving = new TextInputBuilder()
-                .setCustomId("user2_giving")
-                .setLabel("What is User 2 giving?")
-                .setPlaceholder("Example: 2x Brainrots")
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(true);
-
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(user1),
-                new ActionRowBuilder().addComponents(user2),
-                new ActionRowBuilder().addComponents(user1Giving),
-                new ActionRowBuilder().addComponents(user2Giving)
+        const embed = new EmbedBuilder()
+            .setColor("#00BFFF")
+            .setTitle("Cross Trade Details")
+            .addFields(
+                {
+                    name: "User 1",
+                    value: `<@${id1}>`
+                },
+                {
+                    name: "User 2",
+                    value: `<@${id2}>`
+                },
+                {
+                    name: "User 1 is giving",
+                    value: give1
+                },
+                {
+                    name: "User 2 is giving",
+                    value: give2
+                }
             );
 
-            await interaction.showModal(modal);
-            return;
-        }
+        const buttons = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId("cross_confirm")
+                .setLabel("Confirm")
+                .setStyle(ButtonStyle.Success),
 
-        // CROSS TRADE FORM
-        if (
-            interaction.isModalSubmit() &&
-            interaction.customId === "cross_trade_form"
-        ) {
-            const user1Input = interaction.fields.getTextInputValue("user1");
-            const user2Input = interaction.fields.getTextInputValue("user2");
+            new ButtonBuilder()
+                .setCustomId("cross_cancel")
+                .setLabel("Cancel")
+                .setStyle(ButtonStyle.Danger)
+        );
 
-            const user1Giving =
-                interaction.fields.getTextInputValue("user1_giving");
+        await interaction.reply({
+            embeds: [embed],
+            components: [buttons],
+            ephemeral: true
+        });
 
-            const user2Giving =
-                interaction.fields.getTextInputValue("user2_giving");
+        return;
+    }
 
-            const user1Id = user1Input.replace(/[<@!>]/g, "");
-            const user2Id = user2Input.replace(/[<@!>]/g, "");
+    // Confirm
+    if (interaction.isButton() && interaction.customId === "cross_confirm") {
+        await interaction.update({
+            content: "Cross Trade request created.",
+            embeds: [],
+            components: []
+        });
+        return;
+    }
 
-            const member1 = await interaction.guild.members
-                .fetch(user1Id)
-                .catch(() => null);
-
-            const member2 = await interaction.guild.members
-                .fetch(user2Id)
-                .catch(() => null);
-
-            if (!member1) {
-                await interaction.reply({
-                    content: "User 1 is not in this server.",
-                    ephemeral: true
-                });
-                return;
-            }
-
-            if (!member2) {
-                await interaction.reply({
-                    content: "User 2 is not in this server.",
-                    ephemeral: true
-                });
-                return;
-            }
-
-            if (member1.id === member2.id) {
-                await interaction.reply({
-                    content: "User 1 and User 2 cannot be the same person.",
-                    ephemeral: true
-                });
-                return;
-            }
-
-            const embed = new EmbedBuilder()
-                .setColor("#00BFFF")
-                .setTitle("Cross Trade Details")
-                .setDescription(
-                    "Check the details below before continuing."
-                )
-                .addFields(
-                    {
-                        name: "User 1",
-                        value: `<@${member1.id}>`,
-                        inline: false
-                    },
-                    {
-                        name: "User 2",
-                        value: `<@${member2.id}>`,
-                        inline: false
-                    },
-                    {
-                        name: "User 1 is giving",
-                        value: user1Giving,
-                        inline: false
-                    },
-                    {
-                        name: "User 2 is giving",
-                        value: user2Giving,
-                        inline: false
-                    }
-                )
-                .setFooter({
-                    text: "KA7X Middleman"
-                });
-
-            const row = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId("cross_trade_confirm")
-                        .setLabel("Confirm")
-                        .setStyle(ButtonStyle.Success),
-
-                    new ButtonBuilder()
-                        .setCustomId("cross_trade_cancel")
-                        .setLabel("Cancel")
-                        .setStyle(ButtonStyle.Danger)
-                );
-
-            await interaction.reply({
-                embeds: [embed],
-                components: [row],
-                ephemeral: true
-            });
-
-            return;
-        }
-
-        // CONFIRM
-        if (
-            interaction.isButton() &&
-            interaction.customId === "cross_trade_confirm"
-        ) {
-            const embed = new EmbedBuilder()
-                .setColor("#00BFFF")
-                .setTitle("Cross Trade Request")
-                .setDescription(
-                    "Your Cross Trade request has been created.\n\n" +
-                    "A Middleman can now handle the trade."
-                );
-
-            await interaction.update({
-                embeds: [embed],
-                components: []
-            });
-
-            return;
-        }
-
-        // CANCEL
-        if (
-            interaction.isButton() &&
-            interaction.customId === "cross_trade_cancel"
-        ) {
-            const embed = new EmbedBuilder()
-                .setColor("#00BFFF")
-                .setTitle("Cross Trade Cancelled")
-                .setDescription(
-                    "Your Cross Trade request has been cancelled."
-                );
-
-            await interaction.update({
-                embeds: [embed],
-                components: []
-            });
-
-            return;
-        }
-
-        // MY REQUESTS
-        if (
-            interaction.isButton() &&
-            interaction.customId === "mm_requests"
-        ) {
-            const embed = new EmbedBuilder()
-                .setColor("#00BFFF")
-                .setTitle("My Requests")
-                .setDescription(
-                    "You have no previous Cross Trade requests."
-                );
-
-            const row = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId("mm_home")
-                        .setLabel("Back")
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            await interaction.update({
-                embeds: [embed],
-                components: [row]
-            });
-
-            return;
-        }
-
-        // MM INFO
-        if (
-            interaction.isButton() &&
-            interaction.customId === "mm_info"
-        ) {
-            const embed = new EmbedBuilder()
-                .setColor("#00BFFF")
-                .setTitle("MM Info")
-                .setDescription(
-                    "KA7X Middleman helps users safely complete Cross Trades between different games.\n\n" +
-                    "Both sides are checked before the trade is completed."
-                );
-
-            const row = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId("mm_home")
-                        .setLabel("Back")
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            await interaction.update({
-                embeds: [embed],
-                components: [row]
-            });
-
-            return;
-        }
-
-        // MM RULES
-        if (
-            interaction.isButton() &&
-            interaction.customId === "mm_rules"
-        ) {
-            const embed = new EmbedBuilder()
-                .setColor("#00BFFF")
-                .setTitle("MM Rules")
-                .setDescription(
-                    "1. Follow the assigned Middleman's instructions.\n\n" +
-                    "2. Do not leave during an active trade.\n\n" +
-                    "3. Do not fake proof.\n\n" +
-                    "4. Give exactly what was agreed.\n\n" +
-                    "5. Do not rush the Middleman."
-                );
-
-            const row = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId("mm_home")
-                        .setLabel("Back")
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            await interaction.update({
-                embeds: [embed],
-                components: [row]
-            });
-
-            return;
-        }
-
-        // HOME
-        if (
-            interaction.isButton() &&
-            interaction.customId === "mm_home"
-        ) {
-            const embed = new EmbedBuilder()
-                .setColor("#00BFFF")
-                .setTitle("KA7X Middleman")
-                .setDescription(
-                    "Welcome to the KA7X Cross Trade Middleman system.\n\n" +
-                    "Start a Cross Trade or view your previous requests."
-                )
-                .setFooter({
-                    text: "KA7X Middleman • Safe • Trusted • Secure"
-                });
-
-            const row1 = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId("mm_start")
-                        .setLabel("Start Cross Trade")
-                        .setStyle(ButtonStyle.Primary),
-
-                    new ButtonBuilder()
-                        .setCustomId("mm_requests")
-                        .setLabel("My Requests")
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            const row2 = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId("mm_info")
-                        .setLabel("MM Info")
-                        .setStyle(ButtonStyle.Secondary),
-
-                    new ButtonBuilder()
-                        .setCustomId("mm_rules")
-                        .setLabel("MM Rules")
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            await interaction.update({
-                embeds: [embed],
-                components: [row1, row2]
-            });
-
-            return;
-        }
-
-    } catch (error) {
-        console.error("Interaction error:", error);
-
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({
-                content: "Something went wrong. Please try again.",
-                ephemeral: true
-            }).catch(() => {});
-        }
+    // Cancel
+    if (interaction.isButton() && interaction.customId === "cross_cancel") {
+        await interaction.update({
+            content: "Cross Trade cancelled.",
+            embeds: [],
+            components: []
+        });
     }
 });
 
