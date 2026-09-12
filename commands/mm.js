@@ -9,27 +9,30 @@ const {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("mm")
-        .setDescription("Open the KA7X Middleman system"),
+        .setDescription("Open the KA7X Cross Trade Middleman system"),
 
     async execute(interaction) {
         const embed = new EmbedBuilder()
             .setColor("#00BFFF")
             .setTitle("KA7X Middleman")
             .setDescription(
-                "Welcome to the KA7X Middleman system.\n\n" +
-                "Start a new middleman request or check the status of your previous requests."
-            );
+                "Welcome to the KA7X Cross Trade Middleman system.\n\n" +
+                "Start a Cross Trade request below."
+            )
+            .setFooter({
+                text: "KA7X Middleman • Safe • Trusted • Secure"
+            });
 
         const row = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId("mm_start")
-                    .setLabel("Start MM")
+                    .setLabel("Start Cross Trade")
                     .setStyle(ButtonStyle.Primary),
 
                 new ButtonBuilder()
                     .setCustomId("mm_requests")
-                    .setLabel("MM Status")
+                    .setLabel("My Requests")
                     .setStyle(ButtonStyle.Secondary)
             );
 
