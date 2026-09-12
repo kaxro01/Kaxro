@@ -1,9 +1,7 @@
 const {
     Client,
     GatewayIntentBits,
-    Collection,
-    REST,
-    Routes
+    Collection
 } = require("discord.js");
 
 const fs = require("fs");
@@ -17,10 +15,11 @@ const client = new Client({
 
 client.commands = new Collection();
 
-const commands = [];
 const commandsPath = path.join(__dirname, "commands");
 
 function loadCommands(directory) {
+    if (!fs.existsSync(directory)) return;
+
     const files = fs.readdirSync(directory);
 
     for (const file of files) {
@@ -30,11 +29,19 @@ function loadCommands(directory) {
         if (stat.isDirectory()) {
             loadCommands(filePath);
         } else if (file.endsWith(".js")) {
-            const command = require(filePath);
+            try {
+                const command = require(filePath);
 
-            if (command.data && command.execute) {
-                client.commands.set(command.data.name, command);
-                commands.push(command.data.toJSON());
+                if (command.data && command.execute) {
+                    client.commands.set(
+                        command.data.name,
+                        command
+                    );
+
+                    console.log(`Loaded command: /${command.data.name}`);
+                }
+            } catch (error) {
+                console.error(`Failed to load ${file}:`, error);
             }
         }
     }
@@ -42,23 +49,12 @@ function loadCommands(directory) {
 
 loadCommands(commandsPath);
 
-client.once("ready", async () => {
+client.once("ready", () => {
+    console.log("--------------------------------");
     console.log(`KaXro is online as ${client.user.tag}`);
-    console.log(`Loaded ${client.commands.size} command(s).`);
-
-    try {
-        const rest = new REST({ version: "10" })
-            .setToken(process.env.BOT_TOKEN);
-
-        await rest.put(
-            Routes.applicationCommands(process.env.CLIENT_ID),
-            { body: commands }
-        );
-
-        console.log("Slash commands deployed successfully.");
-    } catch (error) {
-        console.error("Failed to deploy commands:", error);
-    }
+    console.log(`Commands loaded: ${client.commands.size}`);
+    console.log(`Server: ${process.env.GUILD_ID}`);
+    console.log("--------------------------------");
 });
 
 client.on("interactionCreate", async interaction => {
@@ -66,21 +62,27 @@ client.on("interactionCreate", async interaction => {
 
     const command = client.commands.get(interaction.commandName);
 
-    if (!command) return;
+    if (!command) {
+        console.log(`Unknown command: ${interaction.commandName}`);
+        return;
+    }
 
     try {
         await command.execute(interaction);
     } catch (error) {
-        console.error(error);
+        console.error(
+            `Error while running /${interaction.commandName}:`,
+            error
+        );
 
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp({
-                content: "Something went wrong.",
+                content: "Something went wrong while running this command.",
                 ephemeral: true
             });
         } else {
             await interaction.reply({
-                content: "Something went wrong.",
+                content: "Something went wrong while running this command.",
                 ephemeral: true
             });
         }
