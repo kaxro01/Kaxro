@@ -92,7 +92,7 @@ client.on("interactionCreate", async interaction => {
     const giving2 = new TextInputBuilder()
       .setCustomId("giving2")
       .setLabel("What is User 2 giving?")
-      .setPlaceholder("Example: Dragon Cannelloni")
+      .setPlaceholder("Example: 20000 Robux")
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(true);
 
