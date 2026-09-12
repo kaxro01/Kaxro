@@ -9,14 +9,15 @@ const {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName("mm")
-        .setDescription("Open the KaXro Middleman panel"),
+        .setDescription("Open the KA7X Middleman system"),
 
     async execute(interaction) {
         const embed = new EmbedBuilder()
-            .setColor("#C99A3D")
+            .setColor("#00BFFF")
             .setTitle("KA7X Middleman")
             .setDescription(
-                "Use the buttons below to start a middleman request or view your requests."
+                "Welcome to the KA7X Middleman system.\n\n" +
+                "Start a new middleman request or check the status of your previous requests."
             );
 
         const row = new ActionRowBuilder()
@@ -24,13 +25,16 @@ module.exports = {
                 new ButtonBuilder()
                     .setCustomId("mm_start")
                     .setLabel("Start MM")
-                    .setStyle(ButtonStyle.Secondary),
+                    .setStyle(ButtonStyle.Primary),
 
                 new ButtonBuilder()
                     .setCustomId("mm_requests")
                     .setLabel("MM Status")
-                    .setStyle(ButtonStyle.Secondary),
+                    .setStyle(ButtonStyle.Secondary)
+            );
 
+        const row2 = new ActionRowBuilder()
+            .addComponents(
                 new ButtonBuilder()
                     .setCustomId("mm_info")
                     .setLabel("MM Info")
@@ -44,7 +48,8 @@ module.exports = {
 
         await interaction.reply({
             embeds: [embed],
-            components: [row]
+            components: [row, row2],
+            ephemeral: true
         });
     }
 };
