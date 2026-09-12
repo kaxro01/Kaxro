@@ -12,29 +12,26 @@ module.exports = {
         .setDescription("Open the KaXro Middleman panel"),
 
     async execute(interaction) {
-
         const embed = new EmbedBuilder()
+            .setColor("#C99A3D")
             .setTitle("KA7X Middleman")
             .setDescription(
-                "Safe and trusted middleman service for your trades.\n\n" +
-                "Use the buttons below to start an MM or view information."
+                "Use the buttons below to start a middleman request or view information.\n\n" +
+                "Both members must be in this server."
             );
 
-        const row1 = new ActionRowBuilder()
+        const row = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId("mm_start")
                     .setLabel("Start MM")
-                    .setStyle(ButtonStyle.Primary),
+                    .setStyle(ButtonStyle.Secondary),
 
                 new ButtonBuilder()
                     .setCustomId("mm_info")
                     .setLabel("MM Info")
-                    .setStyle(ButtonStyle.Secondary)
-            );
+                    .setStyle(ButtonStyle.Secondary),
 
-        const row2 = new ActionRowBuilder()
-            .addComponents(
                 new ButtonBuilder()
                     .setCustomId("mm_rules")
                     .setLabel("MM Rules")
@@ -48,7 +45,7 @@ module.exports = {
 
         await interaction.reply({
             embeds: [embed],
-            components: [row1, row2]
+            components: [row]
         });
     }
 };
