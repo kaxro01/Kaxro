@@ -1,7 +1,9 @@
 const {
     Client,
     GatewayIntentBits,
-    Collection
+    Collection,
+    REST,
+    Routes
 } = require("discord.js");
 
 const fs = require("fs");
@@ -15,6 +17,8 @@ const client = new Client({
 
 client.commands = new Collection();
 
+const commands = [];
+
 // Load commands
 const commandsPath = path.join(__dirname, "commands");
 
@@ -27,8 +31,10 @@ if (fs.existsSync(commandsPath)) {
         const filePath = path.join(commandsPath, file);
         const command = require(filePath);
 
-        if ("data" in command && "execute" in command) {
+        if (command.data && command.execute) {
             client.commands.set(command.data.name, command);
+            commands.push(command.data.toJSON());
+
             console.log(`Loaded command: ${command.data.name}`);
         }
     }
@@ -37,12 +43,50 @@ if (fs.existsSync(commandsPath)) {
 // Load interaction handler
 const interactionHandler = require("./handlers/interactionHandler");
 
+// Deploy slash commands
+async function deployCommands() {
+    try {
+        if (!process.env.BOT_TOKEN) {
+            throw new Error("BOT_TOKEN is missing.");
+        }
+
+        if (!process.env.CLIENT_ID) {
+            throw new Error("CLIENT_ID is missing.");
+        }
+
+        if (!process.env.GUILD_ID) {
+            throw new Error("GUILD_ID is missing.");
+        }
+
+        const rest = new REST({ version: "10" })
+            .setToken(process.env.BOT_TOKEN);
+
+        console.log(`Deploying ${commands.length} command(s)...`);
+
+        await rest.put(
+            Routes.applicationGuildCommands(
+                process.env.CLIENT_ID,
+                process.env.GUILD_ID
+            ),
+            {
+                body: commands
+            }
+        );
+
+        console.log("All slash commands deployed successfully.");
+    } catch (error) {
+        console.error("Command deployment error:", error);
+    }
+}
+
 // Bot ready
-client.once("ready", () => {
+client.once("clientReady", async () => {
     console.log(`KaXro is online as ${client.user.tag}`);
+
+    await deployCommands();
 });
 
-// Handle commands and buttons
+// Handle interactions
 client.on("interactionCreate", async interaction => {
 
     // Slash commands
