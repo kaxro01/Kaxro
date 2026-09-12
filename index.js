@@ -21,9 +21,9 @@ const client = new Client({
     ]
 });
 
-// ===============================
-// COMMANDS
-// ===============================
+// ==================================================
+// COMMAND LOADER
+// ==================================================
 
 const commands = new Map();
 const commandsPath = path.join(__dirname, "commands");
@@ -33,8 +33,7 @@ if (fs.existsSync(commandsPath)) {
         .filter(file => file.endsWith(".js"));
 
     for (const file of files) {
-        const filePath = path.join(commandsPath, file);
-        const command = require(filePath);
+        const command = require(path.join(commandsPath, file));
 
         if (command.data && command.execute) {
             commands.set(command.data.name, command);
@@ -43,9 +42,9 @@ if (fs.existsSync(commandsPath)) {
     }
 }
 
-// ===============================
-// MM DATA
-// ===============================
+// ==================================================
+// DATABASE
+// ==================================================
 
 const dataFolder = path.join(__dirname, "data");
 const dataFile = path.join(dataFolder, "mmRequests.json");
@@ -77,17 +76,62 @@ function saveRequests(requests) {
     );
 }
 
-// ===============================
-// MAIN INTERACTION HANDLER
-// ===============================
+// ==================================================
+// HOME PAGE
+// ==================================================
+
+function homePage() {
+    const embed = new EmbedBuilder()
+        .setColor("#00BFFF")
+        .setTitle("KA7X Middleman")
+        .setDescription(
+            "Welcome to the KA7X Middleman system.\n\n" +
+            "Start a new middleman request or check the status of your previous requests."
+        );
+
+    const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId("mm_start")
+                .setLabel("Start MM")
+                .setStyle(ButtonStyle.Primary),
+
+            new ButtonBuilder()
+                .setCustomId("mm_requests")
+                .setLabel("My Requests")
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+    const row2 = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId("mm_info")
+                .setLabel("MM Info")
+                .setStyle(ButtonStyle.Secondary),
+
+            new ButtonBuilder()
+                .setCustomId("mm_rules")
+                .setLabel("MM Rules")
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+    return {
+        embeds: [embed],
+        components: [row, row2]
+    };
+}
+
+// ==================================================
+// BUTTON HANDLER
+// ==================================================
 
 client.on("interactionCreate", async interaction => {
 
     try {
 
-        // ==========================================
+        // ==================================================
         // SLASH COMMANDS
-        // ==========================================
+        // ==================================================
 
         if (interaction.isChatInputCommand()) {
 
@@ -98,25 +142,35 @@ client.on("interactionCreate", async interaction => {
             if (!command) return;
 
             await command.execute(interaction);
-
             return;
         }
 
-        // ==========================================
+        // ==================================================
         // BUTTONS
-        // ==========================================
+        // ==================================================
 
         if (interaction.isButton()) {
 
-            // --------------------------------------
+            // ==================================================
+            // HOME
+            // ==================================================
+
+            if (interaction.customId === "mm_home") {
+
+                return interaction.update(
+                    homePage()
+                );
+            }
+
+            // ==================================================
             // START MM
-            // --------------------------------------
+            // ==================================================
 
             if (interaction.customId === "mm_start") {
 
-                const mmRoleId = process.env.MM_ROLE_ID;
+                const roleId = process.env.MM_ROLE_ID;
 
-                if (!mmRoleId) {
+                if (!roleId) {
                     return interaction.update({
                         content: "MM_ROLE_ID is not configured.",
                         embeds: [],
@@ -124,33 +178,30 @@ client.on("interactionCreate", async interaction => {
                     });
                 }
 
-                const role = interaction.guild.roles.cache.get(
-                    mmRoleId
-                );
-
-                if (!role) {
-                    return interaction.update({
-                        content: "The MM Staff role could not be found.",
-                        embeds: [],
-                        components: []
-                    });
-                }
-
-                // Get MM staff members
                 await interaction.guild.members.fetch();
 
                 const mmMembers = interaction.guild.members.cache
                     .filter(member =>
-                        member.roles.cache.has(mmRoleId) &&
-                        !member.user.bot
+                        !member.user.bot &&
+                        member.roles.cache.has(roleId)
                     )
                     .first(25);
 
                 if (mmMembers.length === 0) {
+
                     return interaction.update({
-                        content: "There are currently no MM Staff members available.",
+                        content:
+                            "There are currently no MM Staff members available.",
                         embeds: [],
-                        components: []
+                        components: [
+                            new ActionRowBuilder()
+                                .addComponents(
+                                    new ButtonBuilder()
+                                        .setCustomId("mm_home")
+                                        .setLabel("Back")
+                                        .setStyle(ButtonStyle.Secondary)
+                                )
+                        ]
                     });
                 }
 
@@ -168,72 +219,30 @@ client.on("interactionCreate", async interaction => {
                 const row = new ActionRowBuilder()
                     .addComponents(select);
 
-                const backRow = new ActionRowBuilder()
+                const back = new ActionRowBuilder()
                     .addComponents(
                         new ButtonBuilder()
-                            .setCustomId("mm_back")
+                            .setCustomId("mm_home")
                             .setLabel("Back")
                             .setStyle(ButtonStyle.Secondary)
                     );
 
                 const embed = new EmbedBuilder()
-                    .setColor("#C99A3D")
+                    .setColor("#00BFFF")
                     .setTitle("Choose a Middleman")
                     .setDescription(
-                        "Choose which MM Staff member you want to handle this request."
+                        "Select the MM Staff member you want to handle this Cross Trade."
                     );
 
                 return interaction.update({
                     embeds: [embed],
-                    components: [row, backRow]
+                    components: [row, back]
                 });
             }
 
-            // --------------------------------------
-            // BACK
-            // --------------------------------------
-
-            if (interaction.customId === "mm_back") {
-
-                const embed = new EmbedBuilder()
-                    .setColor("#C99A3D")
-                    .setTitle("KA7X Middleman")
-                    .setDescription(
-                        "Use the buttons below to start a middleman request or view your requests."
-                    );
-
-                const row = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId("mm_start")
-                            .setLabel("Start MM")
-                            .setStyle(ButtonStyle.Secondary),
-
-                        new ButtonBuilder()
-                            .setCustomId("mm_requests")
-                            .setLabel("My Requests")
-                            .setStyle(ButtonStyle.Secondary),
-
-                        new ButtonBuilder()
-                            .setCustomId("mm_info")
-                            .setLabel("MM Info")
-                            .setStyle(ButtonStyle.Secondary),
-
-                        new ButtonBuilder()
-                            .setCustomId("mm_rules")
-                            .setLabel("MM Rules")
-                            .setStyle(ButtonStyle.Secondary)
-                    );
-
-                return interaction.update({
-                    embeds: [embed],
-                    components: [row]
-                });
-            }
-
-            // --------------------------------------
+            // ==================================================
             // MY REQUESTS
-            // --------------------------------------
+            // ==================================================
 
             if (interaction.customId === "mm_requests") {
 
@@ -241,9 +250,12 @@ client.on("interactionCreate", async interaction => {
 
                 const userRequests = requests
                     .filter(request =>
-                        request.user1 === interaction.user.id ||
-                        request.user2 === interaction.user.id ||
-                        request.middleman === interaction.user.id
+                        request.guildId === interaction.guild.id &&
+                        (
+                            request.user1 === interaction.user.id ||
+                            request.user2 === interaction.user.id ||
+                            request.middleman === interaction.user.id
+                        )
                     )
                     .sort(
                         (a, b) =>
@@ -254,16 +266,16 @@ client.on("interactionCreate", async interaction => {
                 if (userRequests.length === 0) {
 
                     const embed = new EmbedBuilder()
-                        .setColor("#C99A3D")
-                        .setTitle("My MM Requests")
+                        .setColor("#00BFFF")
+                        .setTitle("My Requests")
                         .setDescription(
-                            "You don't have any MM requests."
+                            "You don't have any middleman requests."
                         );
 
                     const row = new ActionRowBuilder()
                         .addComponents(
                             new ButtonBuilder()
-                                .setCustomId("mm_back")
+                                .setCustomId("mm_home")
                                 .setLabel("Back")
                                 .setStyle(ButtonStyle.Secondary)
                         );
@@ -287,20 +299,18 @@ client.on("interactionCreate", async interaction => {
                         `User 1: <@${request.user1}>\n` +
                         `User 2: <@${request.user2}>\n` +
                         `Middleman: <@${request.middleman}>\n` +
-                        `User 1 giving: ${request.user1Giving}\n` +
-                        `User 2 giving: ${request.user2Giving}\n` +
                         `Status: **${status}**\n\n`;
                 }
 
                 const embed = new EmbedBuilder()
-                    .setColor("#C99A3D")
-                    .setTitle("My MM Requests")
+                    .setColor("#00BFFF")
+                    .setTitle("My Requests")
                     .setDescription(description);
 
                 const row = new ActionRowBuilder()
                     .addComponents(
                         new ButtonBuilder()
-                            .setCustomId("mm_back")
+                            .setCustomId("mm_home")
                             .setLabel("Back")
                             .setStyle(ButtonStyle.Secondary)
                     );
@@ -311,9 +321,67 @@ client.on("interactionCreate", async interaction => {
                 });
             }
 
-            // --------------------------------------
+            // ==================================================
+            // INFO
+            // ==================================================
+
+            if (interaction.customId === "mm_info") {
+
+                const embed = new EmbedBuilder()
+                    .setColor("#00BFFF")
+                    .setTitle("MM Info")
+                    .setDescription(
+                        "KA7X Middleman helps users complete Cross Trades through an assigned MM Staff member."
+                    );
+
+                const row = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId("mm_home")
+                            .setLabel("Back")
+                            .setStyle(ButtonStyle.Secondary)
+                    );
+
+                return interaction.update({
+                    embeds: [embed],
+                    components: [row]
+                });
+            }
+
+            // ==================================================
+            // RULES
+            // ==================================================
+
+            if (interaction.customId === "mm_rules") {
+
+                const embed = new EmbedBuilder()
+                    .setColor("#00BFFF")
+                    .setTitle("MM Rules")
+                    .setDescription(
+                        "1. Only use the official KA7X MM system.\n" +
+                        "2. Follow your assigned MM's instructions.\n" +
+                        "3. Do not fake proof or information.\n" +
+                        "4. Do not rush the Middleman.\n" +
+                        "5. Report suspicious activity to staff."
+                    );
+
+                const row = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId("mm_home")
+                            .setLabel("Back")
+                            .setStyle(ButtonStyle.Secondary)
+                    );
+
+                return interaction.update({
+                    embeds: [embed],
+                    components: [row]
+                });
+            }
+
+            // ==================================================
             // ACCEPT
-            // --------------------------------------
+            // ==================================================
 
             if (interaction.customId.startsWith("mm_accept_")) {
 
@@ -330,7 +398,7 @@ client.on("interactionCreate", async interaction => {
 
                 if (!request) {
                     return interaction.reply({
-                        content: "This MM request no longer exists.",
+                        content: "This request no longer exists.",
                         ephemeral: true
                     });
                 }
@@ -344,25 +412,27 @@ client.on("interactionCreate", async interaction => {
 
                 if (request.status !== "pending") {
                     return interaction.reply({
-                        content: `This request is already ${request.status}.`,
+                        content:
+                            `This request is already ${request.status}.`,
                         ephemeral: true
                     });
                 }
 
                 request.status = "accepted";
-                request.updatedAt = new Date().toISOString();
+                request.updatedAt =
+                    new Date().toISOString();
 
                 saveRequests(requests);
 
                 const embed = new EmbedBuilder()
-                    .setColor("#C99A3D")
+                    .setColor("#00BFFF")
                     .setTitle("MM Request Accepted")
                     .setDescription(
                         `**User 1:** <@${request.user1}>\n` +
-                        `**User 2:** <@${request.user2}>\n` +
+                        `**User 2:** <@${request.user2}>\n\n` +
+                        `**User 1 gives:** ${request.user1Giving}\n` +
+                        `**User 2 gives:** ${request.user2Giving}\n\n` +
                         `**Middleman:** <@${request.middleman}>\n\n` +
-                        `User 1 gives: ${request.user1Giving}\n` +
-                        `User 2 gives: ${request.user2Giving}\n\n` +
                         `Status: **Accepted**`
                     );
 
@@ -377,37 +447,31 @@ client.on("interactionCreate", async interaction => {
                 ).catch(() => null);
 
                 if (user1) {
+
                     await user1.send({
                         embeds: [
-                            new EmbedBuilder()
-                                .setColor("#C99A3D")
-                                .setTitle("MM Request Accepted")
-                                .setDescription(
-                                    `<@${request.user2}> accepted your request.\n\n` +
-                                    `Middleman: <@${request.middleman}>\n\n` +
-                                    `User 1 gives: ${request.user1Giving}\n` +
-                                    `User 2 gives: ${request.user2Giving}`
-                                )
+                            embed
                         ]
                     }).catch(() => {});
                 }
 
-                // Notify MM
+                // Notify Middleman
                 const middleman = await client.users.fetch(
                     request.middleman
                 ).catch(() => null);
 
                 if (middleman) {
+
                     await middleman.send({
                         embeds: [
                             new EmbedBuilder()
-                                .setColor("#C99A3D")
-                                .setTitle("New MM Request")
+                                .setColor("#00BFFF")
+                                .setTitle("New MM Request Assigned")
                                 .setDescription(
-                                    `You have been selected as the Middleman for MM #${request.id}.\n\n` +
-                                    `User 1: <@${request.user1}>\n` +
+                                    `You have been selected as the Middleman for **MM #${request.id}**.\n\n` +
+                                    `**User 1:** <@${request.user1}>\n` +
                                     `Giving: ${request.user1Giving}\n\n` +
-                                    `User 2: <@${request.user2}>\n` +
+                                    `**User 2:** <@${request.user2}>\n` +
                                     `Giving: ${request.user2Giving}\n\n` +
                                     `Status: **Accepted**`
                                 )
@@ -418,9 +482,9 @@ client.on("interactionCreate", async interaction => {
                 return;
             }
 
-            // --------------------------------------
+            // ==================================================
             // DECLINE
-            // --------------------------------------
+            // ==================================================
 
             if (interaction.customId.startsWith("mm_decline_")) {
 
@@ -437,7 +501,7 @@ client.on("interactionCreate", async interaction => {
 
                 if (!request) {
                     return interaction.reply({
-                        content: "This MM request no longer exists.",
+                        content: "This request no longer exists.",
                         ephemeral: true
                     });
                 }
@@ -451,25 +515,28 @@ client.on("interactionCreate", async interaction => {
 
                 if (request.status !== "pending") {
                     return interaction.reply({
-                        content: `This request is already ${request.status}.`,
+                        content:
+                            `This request is already ${request.status}.`,
                         ephemeral: true
                     });
                 }
 
                 request.status = "declined";
-                request.updatedAt = new Date().toISOString();
+                request.updatedAt =
+                    new Date().toISOString();
 
                 saveRequests(requests);
 
-                const embed = new EmbedBuilder()
-                    .setColor("#C99A3D")
-                    .setTitle("MM Request Declined")
-                    .setDescription(
-                        "This middleman request has been declined."
-                    );
-
                 await interaction.update({
-                    embeds: [embed],
+                    embeds: [
+                        new EmbedBuilder()
+                            .setColor("#00BFFF")
+                            .setTitle("MM Request Declined")
+                            .setDescription(
+                                `MM #${request.id} has been declined.\n\n` +
+                                `Status: **Declined**`
+                            )
+                    ],
                     components: []
                 });
 
@@ -478,14 +545,14 @@ client.on("interactionCreate", async interaction => {
                 ).catch(() => null);
 
                 if (user1) {
+
                     await user1.send({
                         embeds: [
                             new EmbedBuilder()
-                                .setColor("#C99A3D")
+                                .setColor("#00BFFF")
                                 .setTitle("MM Request Declined")
                                 .setDescription(
-                                    `<@${request.user2}> declined your MM request.\n\n` +
-                                    `MM #${request.id}\n` +
+                                    `<@${request.user2}> declined MM #${request.id}.\n\n` +
                                     `Status: **Declined**`
                                 )
                         ]
@@ -494,102 +561,43 @@ client.on("interactionCreate", async interaction => {
 
                 return;
             }
-
-            // --------------------------------------
-            // INFO
-            // --------------------------------------
-
-            if (interaction.customId === "mm_info") {
-
-                const embed = new EmbedBuilder()
-                    .setColor("#C99A3D")
-                    .setTitle("MM Info")
-                    .setDescription(
-                        "KA7X Middleman provides a safe process for completing trades with a trusted MM Staff member."
-                    );
-
-                const row = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId("mm_back")
-                            .setLabel("Back")
-                            .setStyle(ButtonStyle.Secondary)
-                    );
-
-                return interaction.update({
-                    embeds: [embed],
-                    components: [row]
-                });
-            }
-
-            // --------------------------------------
-            // RULES
-            // --------------------------------------
-
-            if (interaction.customId === "mm_rules") {
-
-                const embed = new EmbedBuilder()
-                    .setColor("#C99A3D")
-                    .setTitle("MM Rules")
-                    .setDescription(
-                        "1. Follow the assigned MM's instructions.\n" +
-                        "2. Do not fake proof.\n" +
-                        "3. Do not rush the MM.\n" +
-                        "4. Keep the trade inside the official MM process.\n" +
-                        "5. Report any problems to MM Staff."
-                    );
-
-                const row = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId("mm_back")
-                            .setLabel("Back")
-                            .setStyle(ButtonStyle.Secondary)
-                    );
-
-                return interaction.update({
-                    embeds: [embed],
-                    components: [row]
-                });
-            }
         }
 
-        // ==========================================
-        // SELECT MIDDLEMAN
-        // ==========================================
+        // ==================================================
+        // SELECT MENUS
+        // ==================================================
 
         if (interaction.isStringSelectMenu()) {
 
-            if (interaction.customId !== "mm_select_staff") {
-                return;
-            }
+            // ==================================================
+            // SELECT MIDDLEMAN
+            // ==================================================
 
-            const middlemanId = interaction.values[0];
+            if (interaction.customId === "mm_select_staff") {
 
-            const member = await interaction.guild.members
-                .fetch(middlemanId)
-                .catch(() => null);
+                const middlemanId =
+                    interaction.values[0];
 
-            if (!member) {
-                return interaction.update({
-                    content: "That Middleman is no longer in the server.",
-                    embeds: [],
-                    components: []
-                });
-            }
+                const middleman =
+                    await interaction.guild.members
+                        .fetch(middlemanId)
+                        .catch(() => null);
 
-            const mmRoleId = process.env.MM_ROLE_ID;
+                if (!middleman) {
+                    return interaction.update({
+                        content:
+                            "That Middleman is no longer in the server.",
+                        embeds: [],
+                        components: []
+                    });
+                }
 
-            if (!member.roles.cache.has(mmRoleId)) {
-                return interaction.update({
-                    content: "That member is no longer an MM Staff member.",
-                    embeds: [],
-                    components: []
-                });
-            }
-
-            // ==========================================
-            // SELECT USER 2
-            // ==========================================
-
-            const select = new StringSelectMenu
+                if (
+                    !middleman.roles.cache.has(
+                        process.env.MM_ROLE_ID
+                    )
+                ) {
+                    return interaction.update({
+                        content:
+                            "That member is no longer an MM Staff member.",
+                    
